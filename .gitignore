@@ -1,0 +1,41 @@
+# Environment files (keep keys secret)
+.env
+.env.local
+.env.*.local
+
+# Node modules
+node_modules/
+
+# Hardhat artifacts
+cache/
+artifacts/
+typechain/
+typechain-types/
+
+# ABI exports
+data/abi/
+
+# Build outputs
+dist/
+build/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+
+# Test coverage
+coverage/
+
+# Final assignment files (assignment only, not to be committed)
+final_assignment.pdf
+final_assignment.docx
+
+# Misc
+*.tgz
