@@ -44,13 +44,12 @@ contract SavingCore is ERC721, Ownable, Pausable, ReentrancyGuard {
     mapping(uint256 => SavingPlan) public plans;
     mapping(uint256 => DepositCertificate) public deposits;
 
-    event PlanCreated(uint256 indexed planId, uint256 minAmount, uint256 maxAmount, uint256 tenorDays, uint256 aprBps, uint256 penaltyBps);
-    event PlanUpdated(uint256 indexed planId, bool enabled);
-    event DepositOpened(uint256 indexed depositId, address indexed user, uint256 planId, uint256 amount);
-    event WithdrawnAtMaturity(uint256 indexed depositId, address indexed user, uint256 principal, uint256 interest);
-    event EarlyWithdrawn(uint256 indexed depositId, address indexed user, uint256 principal, uint256 penalty);
-    event Renewed(address indexed user, uint256 oldDepositId, uint256 newDepositId, uint256 newPrincipal);
-    event AutoRenewed(address indexed user, uint256 oldDepositId, uint256 newDepositId, uint256 newPrincipal);
+    // Required Events (Section 5)
+    event PlanCreated(uint256 planId, uint256 tenorDays, uint256 aprBps);
+    event PlanUpdated(uint256 planId, uint256 newAprBps);
+    event DepositOpened(uint256 depositId, address owner, uint256 planId, uint256 principal, uint256 maturityAt, uint256 aprBpsAtOpen);
+    event Withdrawn(uint256 depositId, address owner, uint256 principal, uint256 interest, bool isEarly);
+    event Renewed(uint256 oldDepositId, uint256 newDepositId, uint256 newPrincipal, uint256 newPlanId);
 
     constructor(address _paymentToken, address _vaultManager) 
         ERC721("DepositCertificate", "DC") 
@@ -58,10 +57,9 @@ contract SavingCore is ERC721, Ownable, Pausable, ReentrancyGuard {
     {
         paymentToken = IERC20(_paymentToken);
         vaultManager = IVaultManager(_vaultManager);
-        _planCounter = 0;
-        _depositCounter = 0;
     }
 
+    // Admin Functions (Section 4)
     function createPlan(
         uint256 minAmount,
         uint256 maxAmount,
@@ -71,10 +69,8 @@ contract SavingCore is ERC721, Ownable, Pausable, ReentrancyGuard {
     ) external onlyOwner {
         require(tenorDays > 0, "Tenor must be positive");
         require(aprBps <= 10000, "APR cannot exceed 100%");
-        require(penaltyBps <= 10000, "Penalty cannot exceed 100%");
-        require(maxAmount > minAmount, "Max must exceed min");
-
-        uint256 planId = _planCounter;
+        
+        uint256 planId = _planCounter++;
         plans[planId] = SavingPlan({
             minAmount: minAmount,
             maxAmount: maxAmount,
@@ -83,27 +79,44 @@ contract SavingCore is ERC721, Ownable, Pausable, ReentrancyGuard {
             penaltyBps: penaltyBps,
             enabled: true
         });
-        _planCounter++;
-        emit PlanCreated(planId, minAmount, maxAmount, tenorDays, aprBps, penaltyBps);
+        emit PlanCreated(planId, tenorDays, aprBps);
     }
 
-    function updatePlan(uint256 planId, bool enabled) external onlyOwner {
+    function updatePlan(uint256 planId, uint256 newAprBps) external onlyOwner {
         require(plans[planId].tenorDays > 0, "Plan does not exist");
-        plans[planId].enabled = enabled;
-        emit PlanUpdated(planId, enabled);
+        require(newAprBps <= 10000, "APR cannot exceed 100%");
+        plans[planId].aprBps = newAprBps;
+        emit PlanUpdated(planId, newAprBps);
     }
 
+    function enablePlan(uint256 planId) external onlyOwner {
+        require(plans[planId].tenorDays > 0, "Plan does not exist");
+        plans[planId].enabled = true;
+    }
+
+    function disablePlan(uint256 planId) external onlyOwner {
+        require(plans[planId].tenorDays > 0, "Plan does not exist");
+        plans[planId].enabled = false;
+    }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    // User Flows (Section 3)
     function openDeposit(uint256 planId, uint256 amount) external nonReentrant whenNotPaused {
         SavingPlan memory plan = plans[planId];
         require(plan.enabled, "Plan not enabled");
-        require(amount >= plan.minAmount, "Below minimum");
-        require(amount <= plan.maxAmount, "Above maximum");
+        if (plan.minAmount > 0) require(amount >= plan.minAmount, "Below minimum");
+        if (plan.maxAmount > 0) require(amount <= plan.maxAmount, "Above maximum");
 
         paymentToken.transferFrom(msg.sender, address(this), amount);
 
-        uint256 depositId = _depositCounter;
-        _depositCounter++;
-
+        uint256 depositId = _depositCounter++;
         uint256 maturityAt = block.timestamp + plan.tenorDays * 86400;
 
         deposits[depositId] = DepositCertificate({
@@ -118,7 +131,7 @@ contract SavingCore is ERC721, Ownable, Pausable, ReentrancyGuard {
         });
 
         _safeMint(msg.sender, depositId);
-        emit DepositOpened(depositId, msg.sender, planId, amount);
+        emit DepositOpened(depositId, msg.sender, planId, amount, maturityAt, plan.aprBps);
     }
 
     function withdrawAtMaturity(uint256 depositId) external nonReentrant whenNotPaused {
@@ -134,7 +147,7 @@ contract SavingCore is ERC721, Ownable, Pausable, ReentrancyGuard {
         vaultManager.payInterest(msg.sender, interest);
         paymentToken.transfer(msg.sender, deposit.principal);
 
-        emit WithdrawnAtMaturity(depositId, msg.sender, deposit.principal, interest);
+        emit Withdrawn(depositId, msg.sender, deposit.principal, interest, false);
     }
 
     function earlyWithdraw(uint256 depositId) external nonReentrant whenNotPaused {
@@ -150,7 +163,7 @@ contract SavingCore is ERC721, Ownable, Pausable, ReentrancyGuard {
         paymentToken.transfer(msg.sender, netPrincipal);
         paymentToken.transfer(vaultManager.feeReceiver(), penalty);
 
-        emit EarlyWithdrawn(depositId, msg.sender, deposit.principal, penalty);
+        emit Withdrawn(depositId, msg.sender, deposit.principal, 0, true);
     }
 
     function renewDeposit(uint256 depositId, uint256 newPlanId) external nonReentrant whenNotPaused {
@@ -165,13 +178,16 @@ contract SavingCore is ERC721, Ownable, Pausable, ReentrancyGuard {
         uint256 interest = _calculateInterest(deposit.principal, deposit.aprBpsAtOpen, deposit.tenorDays);
         uint256 newPrincipal = deposit.principal + interest;
 
-        require(newPrincipal >= newPlan.minAmount, "New principal below min");
-        require(newPrincipal <= newPlan.maxAmount, "New principal above max");
+        if (newPlan.minAmount > 0) require(newPrincipal >= newPlan.minAmount, "New principal below min");
+        if (newPlan.maxAmount > 0) require(newPrincipal <= newPlan.maxAmount, "New principal above max");
 
         deposit.status = DepositStatus.ManualRenewed;
 
-        uint256 newDepositId = _depositCounter;
-        _depositCounter++;
+        // Pull interest from Vault to Core to back the new principal
+        vaultManager.payInterest(address(this), interest);
+
+        uint256 newDepositId = _depositCounter++;
+        uint256 newMaturityAt = block.timestamp + newPlan.tenorDays * 86400;
 
         deposits[newDepositId] = DepositCertificate({
             planId: newPlanId,
@@ -180,12 +196,12 @@ contract SavingCore is ERC721, Ownable, Pausable, ReentrancyGuard {
             aprBpsAtOpen: newPlan.aprBps,
             penaltyBpsAtOpen: newPlan.penaltyBps,
             startAt: block.timestamp,
-            maturityAt: block.timestamp + newPlan.tenorDays * 86400,
+            maturityAt: newMaturityAt,
             status: DepositStatus.Active
         });
 
         _safeMint(msg.sender, newDepositId);
-        emit Renewed(msg.sender, depositId, newDepositId, newPrincipal);
+        emit Renewed(depositId, newDepositId, newPrincipal, newPlanId);
     }
 
     function autoRenewDeposit(uint256 depositId) external nonReentrant whenNotPaused {
@@ -198,22 +214,25 @@ contract SavingCore is ERC721, Ownable, Pausable, ReentrancyGuard {
 
         deposit.status = DepositStatus.AutoRenewed;
 
-        uint256 newDepositId = _depositCounter;
-        _depositCounter++;
+        // Pull interest from Vault to Core
+        vaultManager.payInterest(address(this), interest);
+
+        uint256 newDepositId = _depositCounter++;
+        uint256 newMaturityAt = block.timestamp + deposit.tenorDays * 86400;
 
         deposits[newDepositId] = DepositCertificate({
             planId: deposit.planId,
             principal: newPrincipal,
             tenorDays: deposit.tenorDays,
-            aprBpsAtOpen: deposit.aprBpsAtOpen,
+            aprBpsAtOpen: deposit.aprBpsAtOpen, // Preserve original APR (Section 3.5)
             penaltyBpsAtOpen: deposit.penaltyBpsAtOpen,
             startAt: block.timestamp,
-            maturityAt: block.timestamp + deposit.tenorDays * 86400,
+            maturityAt: newMaturityAt,
             status: DepositStatus.Active
         });
 
         _safeMint(ownerOf(depositId), newDepositId);
-        emit AutoRenewed(ownerOf(depositId), depositId, newDepositId, newPrincipal);
+        emit Renewed(depositId, newDepositId, newPrincipal, deposit.planId);
     }
 
     function getDeposit(uint256 depositId) external view returns (DepositCertificate memory) {
@@ -225,6 +244,8 @@ contract SavingCore is ERC721, Ownable, Pausable, ReentrancyGuard {
     }
 
     function _calculateInterest(uint256 principal, uint256 aprBps, uint256 tenorDays) internal pure returns (uint256) {
-        return (principal * aprBps * tenorDays) / 365 / 10000;
+        // formula: interest = (principal * aprBps * tenorDays * 86400) / (365 * 24 * 3600 * 10,000)
+        // simplified: (principal * aprBps * tenorDays) / (365 * 10,000)
+        return (principal * aprBps * tenorDays) / (365 * 10000);
     }
 }

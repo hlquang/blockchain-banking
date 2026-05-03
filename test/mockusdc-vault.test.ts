@@ -87,7 +87,7 @@ describe("VaultManager", function () {
     const withdrawAmount = ethers.parseUnits("2000", 6);
     const ownerBalanceBefore = await mockUSDC.balanceOf(owner.address);
 
-    await vaultManager.withdrawFromVault(withdrawAmount);
+    await vaultManager.withdrawVault(withdrawAmount);
 
     expect(await vaultManager.totalVaultFunds()).to.equal(fundAmount - withdrawAmount);
     expect(await mockUSDC.balanceOf(owner.address)).to.equal(ownerBalanceBefore + withdrawAmount);
@@ -128,6 +128,6 @@ describe("VaultManager", function () {
     await vaultManager.pause();
 
     await expect(vaultManager.fundVault(fundAmount)).to.be.reverted;
-    await expect(vaultManager.withdrawFromVault(fundAmount)).to.be.reverted;
+    await expect(vaultManager.withdrawVault(fundAmount)).to.be.reverted;
   });
 });

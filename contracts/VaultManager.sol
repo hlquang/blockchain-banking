@@ -28,7 +28,7 @@ contract VaultManager is Ownable, Pausable {
         emit VaultFunded(msg.sender, amount, totalVaultFunds);
     }
 
-    function withdrawFromVault(uint256 amount) external onlyOwner whenNotPaused {
+    function withdrawVault(uint256 amount) external onlyOwner whenNotPaused {
         require(amount > 0, "Amount must be positive");
         require(amount <= totalVaultFunds, "Insufficient vault funds");
         totalVaultFunds -= amount;
