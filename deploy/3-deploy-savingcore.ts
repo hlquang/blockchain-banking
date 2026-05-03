@@ -7,21 +7,24 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await getNamedAccounts();
 
   console.log("====================");
-  console.log("Deploying VaultManager");
+  console.log("Deploying SavingCore");
   console.log("====================");
 
   const mockUSDCDeployment = await deployments.get("MockUSDC");
-  console.log("MockUSDC address:", mockUSDCDeployment.address);
+  const vaultManagerDeployment = await deployments.get("VaultManager");
 
-  await deploy("VaultManager", {
-    contract: "VaultManager",
-    args: [mockUSDCDeployment.address],
+  console.log("MockUSDC address:", mockUSDCDeployment.address);
+  console.log("VaultManager address:", vaultManagerDeployment.address);
+
+  await deploy("SavingCore", {
+    contract: "SavingCore",
+    args: [mockUSDCDeployment.address, vaultManagerDeployment.address],
     from: deployer,
     log: true,
     autoMine: true,
   });
 };
 
-func.tags = ["VaultManager"];
-func.dependencies = ["MockUSDC"];
+func.tags = ["SavingCore"];
+func.dependencies = ["MockUSDC", "VaultManager"];
 export default func;

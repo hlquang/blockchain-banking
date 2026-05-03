@@ -36,6 +36,7 @@ coverage/
 # Final assignment files (assignment only, not to be committed)
 final_assignment.pdf
 final_assignment.docx
+final_assignment.txt
 
 # Misc
 *.tgz
