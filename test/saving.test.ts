@@ -49,6 +49,18 @@ describe("SavingCore", function () {
       expect(plan.enabled).to.equal(true);
     });
 
+    it("should reject invalid APR over 100%", async function () {
+      await expect(
+        savingCore.createPlan(
+          ethers.parseUnits("10", 6),
+          ethers.parseUnits("10000", 6),
+          90,
+          10001,
+          100
+        )
+      ).to.be.reverted;
+    });
+
     it("should update plan APR", async function () {
       await savingCore.createPlan(ethers.parseUnits("10", 6), ethers.parseUnits("10000", 6), 90, 400, 100);
       await expect(savingCore.updatePlan(0, 500))
@@ -84,6 +96,31 @@ describe("SavingCore", function () {
       const deposit = await savingCore.getDeposit(0);
       expect(deposit.principal).to.equal(depositAmount);
     });
+
+    it("should reject deposit below minimum", async function () {
+      const depositAmount = ethers.parseUnits("5", 6);
+      await mockUSDC.connect(user).approve(savingCore.target, depositAmount);
+      await expect(
+        savingCore.connect(user).openDeposit(0, depositAmount)
+      ).to.be.reverted;
+    });
+
+    it("should reject deposit above maximum", async function () {
+      const depositAmount = ethers.parseUnits("20000", 6);
+      await mockUSDC.connect(user).approve(savingCore.target, depositAmount);
+      await expect(
+        savingCore.connect(user).openDeposit(0, depositAmount)
+      ).to.be.reverted;
+    });
+
+    it("should reject deposit on disabled plan", async function () {
+      await savingCore.disablePlan(0);
+      const depositAmount = ethers.parseUnits("1000", 6);
+      await mockUSDC.connect(user).approve(savingCore.target, depositAmount);
+      await expect(
+        savingCore.connect(user).openDeposit(0, depositAmount)
+      ).to.be.reverted;
+    });
   });
 
   describe("withdrawAtMaturity", function () {
@@ -108,6 +145,23 @@ describe("SavingCore", function () {
         .to.emit(savingCore, "Withdrawn")
         .withArgs(0, user.address, ethers.parseUnits("1000", 6), interest, false);
     });
+
+    it("should reject withdrawal too early", async function () {
+      await expect(
+        savingCore.connect(user).withdrawAtMaturity(0)
+      ).to.be.reverted;
+    });
+
+    it("should reject already withdrawn deposit", async function () {
+      await network.provider.send("evm_increaseTime", [90 * ONE_DAY]);
+      await network.provider.send("evm_mine", []);
+
+      await savingCore.connect(user).withdrawAtMaturity(0);
+
+      await expect(
+        savingCore.connect(user).withdrawAtMaturity(0)
+      ).to.be.reverted;
+    });
   });
 
   describe("earlyWithdraw", function () {
@@ -124,6 +178,23 @@ describe("SavingCore", function () {
       await expect(savingCore.connect(user).earlyWithdraw(0))
         .to.emit(savingCore, "Withdrawn")
         .withArgs(0, user.address, ethers.parseUnits("1000", 6), 0, true);
+    });
+
+    it("should transfer penalty to feeReceiver and pay no interest", async function () {
+      const userBalanceBefore = await mockUSDC.balanceOf(user.address);
+      const feeBalanceBefore = await mockUSDC.balanceOf(feeReceiver.address);
+
+      await savingCore.connect(user).earlyWithdraw(0);
+
+      const userBalanceAfter = await mockUSDC.balanceOf(user.address);
+      const feeBalanceAfter = await mockUSDC.balanceOf(feeReceiver.address);
+
+      // penalty = 1000 * 500 / 10000 = 50
+      const penalty = ethers.parseUnits("50", 6);
+      const netPrincipal = ethers.parseUnits("1000", 6) - penalty;
+
+      expect(userBalanceAfter - userBalanceBefore).to.equal(netPrincipal);
+      expect(feeBalanceAfter - feeBalanceBefore).to.equal(penalty);
     });
   });
 
@@ -150,8 +221,18 @@ describe("SavingCore", function () {
       await expect(savingCore.connect(user).renewDeposit(0, 1))
         .to.emit(savingCore, "Renewed")
         .withArgs(0, 1, newPrincipal, 1);
-      
+
       expect(await mockUSDC.balanceOf(savingCore.target)).to.be.gt(ethers.parseUnits("1000", 6));
+    });
+
+    it("should update old deposit status to ManualRenewed", async function () {
+      await network.provider.send("evm_increaseTime", [90 * ONE_DAY]);
+      await network.provider.send("evm_mine", []);
+
+      await savingCore.connect(user).renewDeposit(0, 1);
+
+      const oldDeposit = await savingCore.getDeposit(0);
+      expect(oldDeposit.status).to.equal(2); // ManualRenewed
     });
   });
 
@@ -165,6 +246,15 @@ describe("SavingCore", function () {
       const depositAmount = ethers.parseUnits("1000", 6);
       await mockUSDC.connect(user).approve(savingCore.target, depositAmount);
       await savingCore.connect(user).openDeposit(0, depositAmount);
+    });
+
+    it("should reject auto-renew before grace period", async function () {
+      await network.provider.send("evm_increaseTime", [90 * ONE_DAY]);
+      await network.provider.send("evm_mine", []);
+
+      await expect(
+        savingCore.autoRenewDeposit(0)
+      ).to.be.reverted;
     });
 
     it("should allow auto-renew after grace and preserve APR", async function () {

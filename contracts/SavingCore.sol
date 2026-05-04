@@ -239,6 +239,14 @@ contract SavingCore is ERC721, Ownable, Pausable, ReentrancyGuard {
         return deposits[depositId];
     }
 
+    function getCurrentTimestamp() external view returns (uint256) {
+        return block.timestamp;
+    }
+
+    function totalDeposits() external view returns (uint256) {
+        return _depositCounter;
+    }
+
     function getPlan(uint256 planId) external view returns (SavingPlan memory) {
         return plans[planId];
     }

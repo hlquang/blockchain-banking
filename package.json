@@ -10,7 +10,8 @@
     "size": "hardhat size-contracts",
     "clean": "hardhat clean",
     "run:sepolia": "hardhat run --network sepolia",
-    "run:ethereum": "hardhat run --network ethereum"
+    "run:ethereum": "hardhat run --network ethereum",
+    "bot": "hardhat run scripts/bot.ts"
   },
   "license": "ISC",
   "devDependencies": {
