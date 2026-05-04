@@ -95,7 +95,7 @@ root/
 
 ## 5. Business Rules
 
-These rules (from `final_assignment.txt` Section 6) hold at all times:
+These rules hold at all times:
 
 1. **APR and penalty are snapshotted** at deposit open. Admin changes to a plan never affect existing deposits.
 2. **Interest uses simple interest only** - no compounding within a single deposit term.
