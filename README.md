@@ -1,6 +1,6 @@
 # BCBanking: Blockchain Banking System
 
-A blockchain-based term deposit system built on Ethereum. Users lock tokens in saving plans, earn interest, and withdraw at maturity. The system uses ERC721 NFTs as deposit certificates and a dedicated vault for interest payments. Includes a standalone auto-renew bot.
+A blockchain-based term deposit system built for EVM-compatible blockchains (Ethereum, Sepolia, etc.). Users lock tokens in saving plans, earn interest, and withdraw at maturity. The system uses ERC721 NFTs as deposit certificates and a dedicated vault for interest payments. Includes a standalone auto-renew bot.
 
 ## Table of Contents
 
@@ -451,7 +451,3 @@ npm test
 | Vite | 8.x | Frontend build tool |
 | Tailwind CSS | 4.x | Styling |
 | TypeChain | 9.x | Type-safe contract bindings |
-
-## 9. License
-
-MIT
