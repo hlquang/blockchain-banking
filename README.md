@@ -75,47 +75,7 @@ root/
 
 ## 3. System Architecture
 
-```
-                           BCBanking System
-
-┌─────────────────────────────────────────────────────────────────────┐
-│                                                                     │
-│     User                    SavingCore            VaultManager      │
-│  (Depositor)                (ERC721 NFT)          (Interest Pool)   │
-│                                                                     │
-│       │                        │                       │            │
-│       │  ① openDeposit()      │                       │            │
-│       ├───────────────────────►│                       │            │
-│       │   approve + transfer  │   holds principal     │            │
-│       │   mUSDC to contract   │   mints NFT           │            │
-│       │                       │                       │            │
-│       │  ② withdrawAtMaturity │                       │            │
-│       ├───────────────────────►│                       │            │
-│       │                       │   payInterest() ──────►│            │
-│       │◄── principal + int. ──┤◄───────────────────────┤            │
-│       │                       │                       │            │
-│       │  ③ earlyWithdraw()   │                       │            │
-│       ├───────────────────────►│                       │            │
-│       │◄─ principal - penalty │  transfer penalty ───►│ feeRecv    │
-│       │                       │                       │            │
-│       │  ④ renewDeposit()    │                       │            │
-│       ├───────────────────────►│                       │            │
-│       │                       │  payInterest(this) ──►│            │
-│       │   new cert minted     │  interest compounded  │            │
-│       │                       │                       │            │
-│       │  ⑤ autoRenew          │                       │            │
-│       │  Bot (30s) ──────────►│  (same as renew)      │            │
-│       │                       │                       │            │
-├───────┴───────────────────────┴───────────────────────┴────────────┤
-│                                                                     │
-│   Admin (Owner)                                                     │
-│       │                                                             │
-│       ├──► createPlan / updatePlan / enablePlan / disablePlan        │
-│       ├──► fundVault / withdrawVault                                 │
-│       ├──► setFeeReceiver                                            │
-│       └──► pause / unpause                                           │
-└─────────────────────────────────────────────────────────────────────┘
-```
+![System Architecture](images/swimlane_diagram.png)
 
 **Flow descriptions:**
 
