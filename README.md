@@ -219,8 +219,6 @@ To import: MetaMask -> Account icon -> Import Account -> paste private key.
 
 Watch the demo video: [BCBanking Demo](https://youtu.be/iMO0wjUA0KE)
 
-[![BCBanking Demo](https://img.youtube.com/vi/iMO0wjUA0KE/0.jpg)](https://youtu.be/iMO0wjUA0KE)
-
 This video walks through all features including admin setup, user deposits, withdrawals, renewals, pause/unpause, and the auto-renew bot.
 
 ### Fast-Forwarding Time (For Demo)
