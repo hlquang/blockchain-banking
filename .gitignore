@@ -34,6 +34,11 @@ Thumbs.db
 # Test coverage
 coverage/
 
+# Large media files
+assets/*.mp4
+assets/*.mov
+assets/*.avi
+
 # Final assignment files (assignment only, not to be committed)
 final_assignment.pdf
 final_assignment.docx

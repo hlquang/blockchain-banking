@@ -52,6 +52,8 @@ export function useBanking(
     async (planId: number, amount: string) => {
       if (!savingCore || !mockUSDC || !account) return;
       const amt = parseUnits(amount, 6);
+      const balance = await mockUSDC.balanceOf(account);
+      if (balance < amt) throw new Error("Insufficient mUSDC balance");
       const allowance = await mockUSDC.allowance(account, savingCore.target);
       if (allowance < amt) {
         const appTx = await mockUSDC.approve(savingCore.target, amt);
@@ -68,20 +70,25 @@ export function useBanking(
     const deposits: Deposit[] = [];
     const total = Number(await savingCore.totalDeposits());
     for (let i = 0; i < total; i++) {
-      const owner = await savingCore.ownerOf(i);
-      if (owner.toLowerCase() === account.toLowerCase()) {
-        const d = await savingCore.getDeposit(i);
-        deposits.push({
-          id: i,
-          planId: Number(d.planId),
-          principal: d.principal,
-          tenorDays: Number(d.tenorDays),
-          aprBpsAtOpen: Number(d.aprBpsAtOpen),
-          penaltyBpsAtOpen: Number(d.penaltyBpsAtOpen),
-          startAt: Number(d.startAt),
-          maturityAt: Number(d.maturityAt),
-          status: Number(d.status) as DepositStatus,
-        });
+      try {
+        const owner = await savingCore.ownerOf(i);
+        if (owner.toLowerCase() === account.toLowerCase()) {
+          const d = await savingCore.getDeposit(i);
+          deposits.push({
+            id: i,
+            planId: Number(d.planId),
+            principal: d.principal,
+            tenorDays: Number(d.tenorDays),
+            aprBpsAtOpen: Number(d.aprBpsAtOpen),
+            penaltyBpsAtOpen: Number(d.penaltyBpsAtOpen),
+            startAt: Number(d.startAt),
+            maturityAt: Number(d.maturityAt),
+            status: Number(d.status) as DepositStatus,
+          });
+        }
+      } catch (e) {
+        console.log(`getUserDeposits: failed at index ${i}`, e);
+        continue;
       }
     }
     return deposits;
@@ -92,19 +99,24 @@ export function useBanking(
     const deposits: Deposit[] = [];
     const total = Number(await savingCore.totalDeposits());
     for (let i = 0; i < total; i++) {
-      const d = await savingCore.getDeposit(i);
-      deposits.push({
-        id: i,
-        planId: Number(d.planId),
-        owner: await savingCore.ownerOf(i),
-        principal: d.principal,
-        tenorDays: Number(d.tenorDays),
-        aprBpsAtOpen: Number(d.aprBpsAtOpen),
-        penaltyBpsAtOpen: Number(d.penaltyBpsAtOpen),
-        startAt: Number(d.startAt),
-        maturityAt: Number(d.maturityAt),
-        status: Number(d.status) as DepositStatus,
-      });
+      try {
+        const d = await savingCore.getDeposit(i);
+        deposits.push({
+          id: i,
+          planId: Number(d.planId),
+          owner: await savingCore.ownerOf(i),
+          principal: d.principal,
+          tenorDays: Number(d.tenorDays),
+          aprBpsAtOpen: Number(d.aprBpsAtOpen),
+          penaltyBpsAtOpen: Number(d.penaltyBpsAtOpen),
+          startAt: Number(d.startAt),
+          maturityAt: Number(d.maturityAt),
+          status: Number(d.status) as DepositStatus,
+        });
+      } catch (e) {
+        console.log(`getAllDeposits: failed at index ${i}`, e);
+        continue;
+      }
     }
     return deposits;
   }, [savingCore]);
@@ -177,6 +189,8 @@ export function useBanking(
     async (amount: string) => {
       if (!vaultManager || !mockUSDC || !account) return;
       const amt = parseUnits(amount, 6);
+      const balance = await mockUSDC.balanceOf(account);
+      if (balance < amt) throw new Error("Insufficient mUSDC balance");
       const allowance = await mockUSDC.allowance(account, vaultManager.target);
       if (allowance < amt) {
         const appTx = await mockUSDC.approve(vaultManager.target, amt);
@@ -204,6 +218,15 @@ export function useBanking(
     return formatUnits(bal, 6);
   }, [vaultManager]);
 
+  const setFeeReceiver = useCallback(
+    async (address: string) => {
+      if (!vaultManager) return;
+      const tx = await vaultManager.setFeeReceiver(address);
+      await tx.wait();
+    },
+    [vaultManager]
+  );
+
   const pauseSystem = useCallback(async () => {
     if (!savingCore) return;
     const tx = await savingCore.pause();
@@ -229,7 +252,7 @@ export function useBanking(
   return {
     getBalance, getFaucet, getPlans, openDeposit, getUserDeposits, getAllDeposits,
     withdraw, earlyWithdraw, renewDeposit,
-    createPlan, updatePlan, enablePlan, disablePlan, fundVault, withdrawVault, getVaultBalance,
+    createPlan, updatePlan, enablePlan, disablePlan, fundVault, withdrawVault, getVaultBalance, setFeeReceiver,
     pauseSystem, unpauseSystem, getIsPaused, getCurrentTimestamp,
   };
 }

@@ -17,14 +17,16 @@ interface AdminViewProps {
   onWithdrawVault: (amount: string) => Promise<void>;
   onPause: () => Promise<void>;
   onUnpause: () => Promise<void>;
+  onSetFeeReceiver: (address: string) => Promise<void>;
 }
 
 export default function AdminView({
-  plans, vaultBalance, isPaused, allDeposits, onCreatePlan, onUpdatePlan, onEnablePlan, onDisablePlan, onFundVault, onWithdrawVault, onPause, onUnpause,
+  plans, vaultBalance, isPaused, allDeposits, onCreatePlan, onUpdatePlan, onEnablePlan, onDisablePlan, onFundVault, onWithdrawVault, onPause, onUnpause, onSetFeeReceiver,
 }: AdminViewProps) {
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [planForm, setPlanForm] = useState({ min: "10", max: "10000", tenor: "90", apr: "400", penalty: "100" });
   const [vaultAmount, setVaultAmount] = useState("50000");
+  const [feeReceiver, setFeeReceiver] = useState("");
   const [showDeposits, setShowDeposits] = useState(false);
 
   const doAction = async (key: string, fn: () => Promise<void>) => {
@@ -106,6 +108,28 @@ export default function AdminView({
           {loading["pause"] || loading["unpause"] ? <Loader2 size={14} className="animate-spin" /> : null}
           {isPaused ? "Unpause System" : "Pause System"}
         </button>
+      </div>
+
+      {/* Fee Receiver */}
+      <div className="bg-bg-card border border-border rounded-xl p-4 mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2 flex-1">
+          <span className="text-sm text-text-secondary whitespace-nowrap">Fee Receiver:</span>
+          <input
+            type="text"
+            value={feeReceiver}
+            onChange={(e) => setFeeReceiver(e.target.value)}
+            placeholder="0x..."
+            className="flex-1 bg-bg-primary border border-border rounded-lg px-3 py-1.5 text-sm text-text-primary font-mono outline-none focus:border-accent"
+          />
+          <button
+            onClick={() => doAction("fee-receiver", () => onSetFeeReceiver(feeReceiver))}
+            disabled={loading["fee-receiver"] || !feeReceiver}
+            className="flex items-center gap-1 bg-accent/10 text-accent px-3 py-1.5 rounded-lg text-sm hover:bg-accent/20 transition disabled:opacity-50 whitespace-nowrap"
+          >
+            {loading["fee-receiver"] ? <Loader2 size={14} className="animate-spin" /> : null}
+            Set Fee Receiver
+          </button>
+        </div>
       </div>
 
       {/* Create Plan Form */}

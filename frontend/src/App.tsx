@@ -21,7 +21,7 @@ export default function App() {
     openDeposit, withdraw, earlyWithdraw, renewDeposit,
     createPlan, updatePlan, enablePlan, disablePlan,
     fundVault, withdrawVault,
-    pauseSystem, unpauseSystem,
+    pauseSystem, unpauseSystem, setFeeReceiver,
   } = useBanking(mockUSDC, vaultManager, savingCore, account);
 
   const [balance, setBalance] = useState("0");
@@ -132,6 +132,10 @@ export default function App() {
   const handleUnpause = useCallback(async () => {
     await safeAction("System unpaused", () => unpauseSystem());
   }, [safeAction, unpauseSystem]);
+
+  const handleSetFeeReceiver = useCallback(async (address: string) => {
+    await safeAction("Fee receiver set", () => setFeeReceiver(address));
+  }, [safeAction, setFeeReceiver]);
 
   const tabs = [
     { key: "plans" as const, label: "Saving Plans", icon: WalletCards },
@@ -252,6 +256,7 @@ export default function App() {
                 onWithdrawVault={handleWithdrawVault}
                 onPause={handlePause}
                 onUnpause={handleUnpause}
+                onSetFeeReceiver={handleSetFeeReceiver}
               />
             )}
           </>
